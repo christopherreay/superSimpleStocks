@@ -63,7 +63,7 @@ class Case_TradesAndStocks(unittest.TestCase):
   def test_failPurchase_timeout(self):
     trade = superSimpleStocks.Trade(self.gbce.stocks['TEA'], 100)
     #hack the trade to make it 6 seconds old without waiting 6 seconds in the test
-    trade.offerTimestamp = time.time() - 6000
+    trade.offerTimestamp = time.time() - 6
     self.assertEqual( trade.purchase()['status'], 'fail' )
     self.assertEqual( trade.purchase()['message'], 'Offer timeout is 5 seconds' )
 
@@ -77,14 +77,72 @@ class Case_TradesAndStocks(unittest.TestCase):
     ##not doing this :)
     pass
 
+class Case_CommandProcessor(unittest.TestCase):
+  def setUp(self):
+    self.commandProcessor = superSimpleStocks.CommandProcessor(superSimpleStocks.GBCE())
+
+  def test_strings(self):
+    result = self.commandProcessor.userInputProcessor("?")
+    self.assertEqual(result, 
+"""bye                     to quit
+list                    to show curent stock information
+buy  symbol quantity [asManyAsPossible | all ] 
+                        to request an offer price to buy
+sell symbol quantity [asManyAsPossible | all ] 
+                        to request an offer price to sell
+confirm                 to confirm an offer (actually buy or sell a stock). Timeout is 5 seconds.
+index                   to get the current GBCE All Share Price Index
+updateFixed symbol percent    
+                        to update the Fixed Dividend Percentage of a Preferred Stock
+"""
+                     )
+    result = self.commandProcessor.userInputProcessor("bye")
+    self.assertEqual(result, "bye")
+
+    result = self.commandProcessor.userInputProcessor("list")
+    self.assertEqual(result, """all the info""")
+
+  def test_buySell(self):
+    result = self.commandProcessor.userInputProcessor("buy TEA 100")
+
+    print result
+    self.assertEqual( 'offer' in result, True )
+    self.assertEqual( result['offer'], 'buy 100 of TEA at 100')
+
+    result = self.commandProcessor.userInputProcessor("sell TEA 100")
+    print result
+
+    self.assertEqual( 'offer' in result, True )
+    self.assertEqual( result['offer'], "sell -100 of TEA at 100")
+    self.assertEqual( self.commandProcessor.currentTrade.quantity < 0, True )
+
+  def test_confirmTooSlow(self):
+    result = self.commandProcessor.userInputProcessor("buy TEA 100")
+
+    self.commandProcessor.currentTrade.offerTimestamp = time.time() - 6
+
+    confirmResult = self.commandProcessor.userInputProcessor("confirm")
+    self.assertEqual( 'status' in confirmResult, True)
+    self.assertEqual( confirmResult['status'] == 'fail', True)
+
+  def test_confirmPurchaseSell(self):
+    result = self.commandProcessor.userInputProcessor("sell TEA 100")
+
+    confirmResult = self.commandProcessor.userInputProcessor("confirm")
+    self.assertEqual( 'status' in confirmResult, True)
+    self.assertEqual( confirmResult['status'] == 'success', True)
+    self.assertEqual( self.commandProcessor.currentTrade.purchased, True)
+    self.assertEqual( self.commandProcessor.currentTrade.stock.tradeHistory[0], self.commandProcessor.currentTrade )
+
 
 def tests():
-  commonStock     = unittest.TestSuite( map( Case_CommonStock     , [ 'test_getDiviendYield', 'test_getPERatio', ]                    ) )
-  preferredStock  = unittest.TestSuite( map( Case_PreferredStock  , [ 'test_getDiviendYield', 'test_updateFixedDividendPercentage' ]  ) )
-  gbce            = unittest.TestSuite( map( Case_GBCE            , [ 'test_index']                                                   ) )
-  tradesAndStocks = unittest.TestSuite( map( Case_TradesAndStocks , [ 'test_purchaseStock', 'test_failPurchase_timeout' ]             ) )
+  commonStock       = unittest.TestSuite( map( Case_CommonStock     , [ 'test_getDiviendYield', 'test_getPERatio', ]                    ) )
+  preferredStock    = unittest.TestSuite( map( Case_PreferredStock  , [ 'test_getDiviendYield', 'test_updateFixedDividendPercentage' ]  ) )
+  gbce              = unittest.TestSuite( map( Case_GBCE            , [ 'test_index']                                                   ) )
+  tradesAndStocks   = unittest.TestSuite( map( Case_TradesAndStocks , [ 'test_purchaseStock', 'test_failPurchase_timeout' ]             ) )
+  commandProcessor  = unittest.TestSuite( map( Case_CommandProcessor, [ 'test_strings', 'test_buySell', 'test_confirmTooSlow', 'test_confirmPurchaseSell' ]             ) )
   
-  return unittest.TestSuite( [commonStock, preferredStock, gbce, tradesAndStocks] )
+  return unittest.TestSuite( [commonStock, preferredStock, gbce, tradesAndStocks, commandProcessor] )
 
 
 if __name__ == '__main__':
