@@ -8,6 +8,98 @@ import ipdb
 class Dependency(dict):
   pass
 
+class depends(object):
+  dependencyID = 0
+  dependencies = {}
+
+  def __init__(self, *config):
+    ipdb.set_trace()
+
+    self.config         = config
+    self.firstRun     = True
+    self.currentValue = None
+
+    self.obj          = None
+    self.underlyingFunction = None
+
+    if config[0] == None:
+      #basic memoise of answer
+      pass
+    elif len(config) == 1 and isinstance(config[0], basestring):
+      #should be a string naming a function in the same class / object
+      self.emitterAttrName = config[0]
+
+      Emitter( self.obj.getattr(self.emitterAttrName), decoratorInstance )
+
+    elif len(config) == 2:
+      #install a tool over the named property
+      pass
+
+  def __call__(self, underlyingFunction):
+    ipdb.set_trace()
+
+    decoratorInstance = self
+    decoratorInstance.underlyingFunction = underlyingFunction
+
+    def wrapped(*args, **kwargs):
+      ipdb.set_trace()
+
+      #self for the object the method is bound to
+      obj                   = args[0]
+      decoratorInstance.obj = obj
+      if decoratorInstance.firstRun    == True:
+        #we need to wrap the function upon which this function's value depends
+        if decoratorInstance.config[0] == None:
+          #basic memoise of answer
+          pass
+        elif len(decoratorInstance.config) == 1 and isinstance(decoratorInstance.config[0], basestring):
+          #should be a string naming a function in the same class / object
+          
+          Emitter( decoratorInstance.obj.getattr(decoratorInstance.emitterAttrName), decoratorInstance )
+        elif len(decoratorInstance.config) == 2:
+          #install a tool over the named property
+          pass
+        
+        #memoizeCurrentValue
+        decoratorInstance.currentValue = underlyingFunction(*args, **kwargs)
+        decoratorInstance.firstRun     = False
+      else:
+        #return memoized value
+        return decoratorInstance.currentValue
+
+    return wrapped
+
+    def call(self):
+      ipdb.set_trace()
+
+      self.underlyingFunction(self.obj)
+
+class Emitter(object):
+  def __init__(self, emittingFunction, decoratorInstance):
+    ipdb.set_trace()
+
+    self.emittingFunction = emittingFunction
+
+    if isinstance(emittingFunction, Emitter):
+      #do something clever
+      # i.e. add this decoratorInstance to the eventListener list
+      emittingFunction.decoratorInstanceList.append(decoratorInstance)
+    else:
+      self.decoratorInstanceList = [ decoratorInstance ]
+      #decoratorInstance.obj.setattribute( decoratorInstance.emitterAttrName, self )
+  def __call__(*args, **kwargs):
+    ipdb.set_trace()
+
+    # obj = args[0]
+    self.emittingFunction(*args, **kwargs)
+    for decorator in self.decoratorInstanceList:
+      decorator.call()
+
+class DictionaryDependency(object):
+  def __init__(self, object, dictionary, testForObject, targetFunctionName):
+    pass
+
+
 class Stock(object):
   def __init__(self, symbol, lastDividend, parValue):
     self.symbol       = symbol
@@ -20,9 +112,13 @@ class Stock(object):
 
     self.stockPool    = "infinite"
 
+    self.dividendYield  = None
+    self.PERatio        = None
+
   def getDividendYield(self):
     raise NotImplementedError("I'd like you to Subclass Stock and implement this Method")
   
+  @depends("getDividendYield")
   def getPERatio(self):
     return 1.0 / self.getDividendYield()
 
@@ -81,6 +177,7 @@ class PreferredStock(Stock):
       self.fixedDividend = newPercentage
     return context
 
+  @depends("updateFixedDividendPercentage")
   def getDividendYield(self):
     return  (   ( (self.fixedDividend / 100) * self.parValue ) 
               /   self.getTickerPrice()
@@ -90,11 +187,12 @@ class CommonStock(Stock):
   def __init__(self, symbol, lastDividend, parValue):
     super(CommonStock, self).__init__(symbol, lastDividend, parValue)
 
+  @depends(None)
   def getDividendYield(self):
-    return self.lastDividend / self.getTickerPrice()
+    self.dividendYield = self.lastDividend / self.getTickerPrice()
 
 
-class GBCE():
+class GBCE(object):
   def __init__(self):
     self.stocks = \
         { "TEA": CommonStock     ("TEA", 0 ,     100 ),
@@ -110,7 +208,14 @@ class GBCE():
       product *= stock.getTickerPrice()
     return pow( product, 1 / float(len(self.stocks)) )
 
-class Trade():
+  #@depends("stocks", DictionaryDependency( lamda (key, item): isinstance(item, PreferredStock), "getDividendYield" ) )
+  def showInfo(self):
+    toReturn = ["symbol", "type", "last dividend", "fixed dividend", "par value"]
+    for (key, stock) in self.stocks.items():
+      toReturn.append("%s     %s     %s     %s     %s" % (stock.symbol, stock.type, stock.lastDividend, stock.fixedDividend, stock.parValue) )
+    return "\n".join(toReturn)
+
+class Trade(object):
   def __init__(self, stock, quantity, asManyAsPossibleOrAll="asManyAsPossible"):
     self.stock                = stock
 
@@ -150,7 +255,6 @@ class Trade():
 
 class CommandProcessor(object):
   def __init__(self, market):
-    self.dependencyGraph  = {}
 
     self.market           = market
     self.currentTrade     = None
@@ -225,8 +329,11 @@ updateFixed symbol percent
     
     elif  command.startswith("updateFixed"):
       commandData = command.split(" ")
-      stock = self.market[ commandData[self.SYMBOL] ]
-      self.solveDependencyGraph(commandData)
+      stock       = self.market.stocks[ commandData[self.SYMBOL] ]
+      toReturn    = stock.updateFixedDividendPercentage( float(commandData[self.PERCENT]) )
+
+
+      #self.solveDependencyGraph(commandData)
 
 
     return toReturn
@@ -235,5 +342,11 @@ updateFixed symbol percent
     pass
 
 
+
+
+
+
+
 if __name__ == "__main__":
+    ipdb.set_trace()
     CommandProcessor(GBCE()).blocking_getUserInput()
