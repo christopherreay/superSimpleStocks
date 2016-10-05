@@ -1,6 +1,10 @@
 from __future__ import division
 
+#utils / libraries
+import time
 
+
+#and beyond
 class Dependency(dict):
   pass
 
@@ -25,11 +29,27 @@ class Stock(object):
     #hilarious
     return self.parValue
 
-  def requestBuy(self, quantity):
-    return Trade(self, quantity)
+  def completeTrade(self, trade, context):
+    if self.stockPool == "infinite":
+      trade.quantity = trade.offerQuantity
+      context.update( { "status"  : "success",
+                        "message" : "You successfully %s of %s at %s %s" % (trade.verb, self.symbol, trade.price, self.currency)
+                      }
+                    )
+    elif trade.style == "all" and ( (self.stockPool - trade.quantity) < 0 ) :
+      context.update( { "status": "fail",
+                        "message": "There are not enough shares in the pool to fulfill your request",
+                      }
+                    )
+      trade.quantity = 0
+      ### TODO code to negotiate purchase over time
+    else:
+      trade.quantity =  min(trade.quantity, self.stockPool)
+      self.stockPool -= trade.quantity
 
-  def requestSell(self, quantity):
-    return Trade(self, quantity * -1)
+    
+    trade.timestamp           = time.time()
+    self.tradeHistory         .append(trade)
 
 class PreferredStock(Stock):
   def __init__(self, symbol, lastDividend, fixedDividend, parValue):
@@ -66,11 +86,24 @@ class CommonStock(Stock):
     return self.lastDividend / self.getTickerPrice()
 
 
+class GBCE():
+  def __init__(self):
+    self.stocks = \
+        { "TEA": CommonStock     ("TEA", 0 ,     100 ),
+          "POP": CommonStock     ("POP", 8 ,     100 ),
+          "ALE": CommonStock     ("ALE", 23,     60  ),
+          "GIN": PreferredStock  ("GIN", 8 , 2,  100 ),
+          "JOE": CommonStock     ("JOE", 13,     250 )
+        }
+  def index(self):
+    #calculate geometric mean
+    product = 1
+    for (symbol, stock) in self.stocks.items():
+      product *= stock.getTickerPrice()
+    return pow( product, 1 / float(len(self.stocks)) )
+
 
 class Trade():
-  def __init__(self, market, symbol, quantity, asManyAsPossibleOrAll="asManyAsPossible"):
-    self.__init__(market.stocks[symbol], quantity, asManyAsPossible)
-
   def __init__(self, stock, quantity, asManyAsPossibleOrAll="asManyAsPossible"):
     self.stock                = stock
 
@@ -85,6 +118,18 @@ class Trade():
 
     self.verb                 = "bought" if self.quantity > 0 else "sold"
 
+  def purchase(self):
+      now = time.time()
+
+      if now - self.offerTimestamp > 5000:
+        context = { "status"  : "fail",
+                    "message" : "Offer timeout is 5 seconds",
+                  }
+      else:
+        context = {}
+        self.stock.completeTrade(self, context)
+
+      return context
 
 #Question: Is the trade price calculated over the last 15 minutes the same as the trade price cumulatively over the entire trading history?
 #Answer: No, because the 15 minute version is something like a sliding average.
