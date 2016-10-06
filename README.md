@@ -31,7 +31,6 @@ Here are the notes for this project:
    - run the program "python superSimpleStocks.py"
    - follow the prompt
    - offers for purchase or sale last five seconds
-     - confim to confirm
      
  #TODO
   - add Dictionary Adapter for the @depends decorator
