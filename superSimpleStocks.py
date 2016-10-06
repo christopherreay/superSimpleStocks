@@ -318,6 +318,7 @@ class GBCE(object):
                           stock.getTickerPrice()
                         ) 
                       )
+    
     return "\n".join(toReturn)
 
 class Trade(object):

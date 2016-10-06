@@ -100,7 +100,13 @@ updateFixed symbol percent
     self.assertEqual(result, "bye")
 
     result = self.commandProcessor.userInputProcessor("list")
-    self.assertEqual(result, """all the info""")
+    self.assertEqual(result,
+"""symbol   type  lastDividend  fixedDividend  parValue  PERatio  dividendYield  price
+s:TEA t:common ld:0 fd:   pv:100 per:0 dy:0.0 p:100
+s:ALE t:common ld:23 fd:   pv:60 per:2.60869565217 dy:0.383333333333 p:60
+s:JOE t:common ld:13 fd:   pv:250 per:19.2307692308 dy:0.052 p:250
+s:POP t:common ld:8 fd:   pv:100 per:12.5 dy:0.08 p:100
+s:GIN t:Preferred ld:8 fd:2 pv:100 per:50.0 dy:0.02 p:100""")
 
   def test_buySell(self):
     result = self.commandProcessor.userInputProcessor("buy TEA 100")
