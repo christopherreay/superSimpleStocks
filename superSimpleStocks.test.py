@@ -140,6 +140,24 @@ s:GIN t:Preferred ld:8 fd:2 pv:100 per:50.0 dy:0.02 p:100""")
     self.assertEqual( self.commandProcessor.currentTrade.purchased, True)
     self.assertEqual( self.commandProcessor.currentTrade.stock.tradeHistory[0], self.commandProcessor.currentTrade )
 
+class Case_depends(unittest.TestCase):
+  def setUp(self):
+    self.commandProcessor = superSimpleStocks.CommandProcessor(superSimpleStocks.GBCE())
+
+  def test_fixedUpdate_dependencyGraph(self):
+    result = self.commandProcessor.userInputProcessor("updateFixed GIN 10")
+    self.assertEqual( result, {'status': 'success', 'message': 'Updating fixed dividend to 10.0'})
+
+    result = self.commandProcessor.userInputProcessor("list")
+    self.assertEqual( result, 
+"""symbol   type  lastDividend  fixedDividend  parValue  PERatio  dividendYield  price
+s:TEA t:common ld:0 fd:   pv:100 per:0 dy:0.0 p:100
+s:ALE t:common ld:23 fd:   pv:60 per:2.60869565217 dy:0.383333333333 p:60
+s:JOE t:common ld:13 fd:   pv:250 per:19.2307692308 dy:0.052 p:250
+s:POP t:common ld:8 fd:   pv:100 per:12.5 dy:0.08 p:100
+s:GIN t:Preferred ld:8 fd:10.0 pv:100 per:10.0 dy:0.1 p:100""" 
+                    )
+
 
 def tests():
   commonStock       = unittest.TestSuite( map( Case_CommonStock     , [ 'test_getDiviendYield', 'test_getPERatio', ]                    ) )
@@ -147,8 +165,9 @@ def tests():
   gbce              = unittest.TestSuite( map( Case_GBCE            , [ 'test_index']                                                   ) )
   tradesAndStocks   = unittest.TestSuite( map( Case_TradesAndStocks , [ 'test_purchaseStock', 'test_failPurchase_timeout' ]             ) )
   commandProcessor  = unittest.TestSuite( map( Case_CommandProcessor, [ 'test_strings', 'test_buySell', 'test_confirmTooSlow', 'test_confirmPurchaseSell' ]             ) )
+  depends           = unittest.TestSuite( map( Case_depends         , [ 'test_fixedUpdate_dependencyGraph' ]                            ) )
   
-  return unittest.TestSuite( [commonStock, preferredStock, gbce, tradesAndStocks, commandProcessor] )
+  return unittest.TestSuite( [commonStock, preferredStock, gbce, tradesAndStocks, commandProcessor, depends] )
 
 
 if __name__ == '__main__':
