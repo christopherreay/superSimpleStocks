@@ -1,8 +1,10 @@
 # superSimpleStocks
 
 Here are the notes for this project: 
- - https://docs.google.com/document/d/1N-ofdZk2hOVOXQskSI74NVhlU0xjPMlDc7SK6lUYEjQ/edit?usp=sharing
- - https://drive.google.com/open?id=0B2ExtwsWVr9DWFhaczY2WlVPZEE
+ - Project Specification
+   - https://drive.google.com/open?id=0B2ExtwsWVr9DWFhaczY2WlVPZEE
+ - My Notes
+   - https://docs.google.com/document/d/1N-ofdZk2hOVOXQskSI74NVhlU0xjPMlDc7SK6lUYEjQ/edit?usp=sharing
  
 # implementation
  - OO representation of 
