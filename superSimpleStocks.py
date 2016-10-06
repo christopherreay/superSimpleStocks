@@ -4,6 +4,48 @@ from __future__ import division
 import time
 import ipdb
 
+class TraverseObject(object):
+  pass
+def o():
+  return  TraverseObject()
+
+def getProperty(obj, address):
+  if isinstance(obj, dict):
+    return obj[address]
+  else:
+    return getattr(obj, address)
+def hasProperty(obj, address):
+  if isinstance(obj, dict):
+    return address in obj
+  else:
+    return hasattr(obj, address)
+def setProperty(obj, address, value):
+  if isinstance(obj, dict):
+    obj[address] = value
+  else:
+    setattr(obj, address, value)
+
+def traverse(obj, address, defaultValueList=None):
+
+  addressCounter  = 0
+  addressList     = address.split(".")
+
+  current = obj
+  for addressItem in addressList:
+    if not hasProperty(current, addressItem):
+      if defaultValueList is None:
+        value = o()
+      else:
+        value = defaultValueList[addressCounter]
+        addressCounter +=1
+      setProperty(current, addressItem, value )
+    current = getProperty(current, addressItem)
+
+
+  return current
+
+
+
 #and beyond
 class Dependency(dict):
   pass
@@ -16,56 +58,51 @@ class depends(object):
     ipdb.set_trace()
 
     self.config         = config
-    self.firstRun     = True
-    self.currentValue = None
-
-    self.obj          = None
-    self.underlyingFunction = None
-
-    if config[0] == None:
-      #basic memoise of answer
-      pass
-    elif len(config) == 1 and isinstance(config[0], basestring):
-      #should be a string naming a function in the same class / object
-      self.emitterAttrName = config[0]
-
-      Emitter( self.obj.getattr(self.emitterAttrName), decoratorInstance )
-
-    elif len(config) == 2:
-      #install a tool over the named property
-      pass
-
+    
   def __call__(self, underlyingFunction):
     ipdb.set_trace()
 
     decoratorInstance = self
-    decoratorInstance.underlyingFunction = underlyingFunction
+    localName = underlyingFunction.__name__
 
     def wrapped(*args, **kwargs):
       ipdb.set_trace()
 
       #self for the object the method is bound to
       obj                   = args[0]
-      decoratorInstance.obj = obj
-      if decoratorInstance.firstRun    == True:
+      context = traverse( obj, "_context.decorators.depends.%s" % (localName, ) )
+
+      if traverse( context, "firstRun", defaultValueList=[ True ] ) == True:
+        context.firstRun     = False
+
+        context.decoratorInstance   = decoratorInstance
+        context.obj                 = obj
+        context.localName           = localName
+        context.underlyingFunction  = underlyingFunction
+        def call(): { getattr(obj, localName)() }
+        context.call = call
+        
         #we need to wrap the function upon which this function's value depends
         if decoratorInstance.config[0] == None:
           #basic memoise of answer
           pass
         elif len(decoratorInstance.config) == 1 and isinstance(decoratorInstance.config[0], basestring):
           #should be a string naming a function in the same class / object
-          
-          Emitter( decoratorInstance.obj.getattr(decoratorInstance.emitterAttrName), decoratorInstance )
+          context.emitterAttrName = context.decoratorInstance.config[0]
+          setattr( obj, context.emitterAttrName, emitter( obj, context.emitterAttrName, context) )
         elif len(decoratorInstance.config) == 2:
           #install a tool over the named property
           pass
         
+        
+
+      if traverse( context, "updateMemoise", defaultValueList=[ True ]) == True:
+        context.updateMemoise = False
         #memoizeCurrentValue
-        decoratorInstance.currentValue = underlyingFunction(*args, **kwargs)
-        decoratorInstance.firstRun     = False
-      else:
-        #return memoized value
-        return decoratorInstance.currentValue
+        context.currentValue  = underlyingFunction(*args, **kwargs)
+        
+
+      return context.currentValue
 
     return wrapped
 
@@ -74,26 +111,50 @@ class depends(object):
 
       self.underlyingFunction(self.obj)
 
-class Emitter(object):
-  def __init__(self, emittingFunction, decoratorInstance):
-    ipdb.set_trace()
+def emitter( obj, emitterAttrName, dependsContext ):
+ 
+  ipdb.set_trace()
 
-    self.emittingFunction = emittingFunction
+  context   = traverse( obj,    "_context.decorators.emitter.%s" % (emitterAttrName) )
+  listeners = traverse(context, "listeners", defaultValueList=[ [] ])
 
-    if isinstance(emittingFunction, Emitter):
-      #do something clever
-      # i.e. add this decoratorInstance to the eventListener list
-      emittingFunction.decoratorInstanceList.append(decoratorInstance)
-    else:
-      self.decoratorInstanceList = [ decoratorInstance ]
-      #decoratorInstance.obj.setattribute( decoratorInstance.emitterAttrName, self )
-  def __call__(*args, **kwargs):
-    ipdb.set_trace()
+  listeners.append(dependsContext)
 
-    # obj = args[0]
-    self.emittingFunction(*args, **kwargs)
-    for decorator in self.decoratorInstanceList:
-      decorator.call()
+  emittingFunction = getattr(obj, emitterAttrName)
+  #wrap_emitter = None
+
+  def wrap_emitter(underlyingFunction):
+    def wrapped_emitter(*args, **kwargs):
+      ipdb.set_trace()
+
+      toReturn = underlyingFunction(*args, **kwargs)
+      if traverse( context, "oldValue", defaultValueList=[None] ) == toReturn:
+        return toReturn
+      context.oldValue = toReturn
+
+      traverse( context, "cycle", defaultValueList=[ list(context.listeners) ])
+      traverse( context, "root",  defaultValueList=[ 0 ] )
+
+      context.root += 1
+      #This needs to remove all circular dependencies
+      for listener in context.listeners:
+        if listener in context.cycle:
+          context.cycle.remove(listener)
+          listener.updateMemoise = True
+          listener.call()
+
+      context.root -= 1
+      if context.root == 0:
+        delattr(context, "cycle")
+
+      return toReturn
+
+
+    return wrapped_emitter
+
+  return wrap_emitter(emittingFunction)
+
+
 
 class DictionaryDependency(object):
   def __init__(self, object, dictionary, testForObject, targetFunctionName):
@@ -103,6 +164,7 @@ class DictionaryDependency(object):
 class Stock(object):
   def __init__(self, symbol, lastDividend, parValue):
     self.symbol       = symbol
+    self.type         = "abstractType"
     self.lastDividend = lastDividend
     self.parValue     = parValue
     self.currency     = "USD"
@@ -115,12 +177,16 @@ class Stock(object):
     self.dividendYield  = None
     self.PERatio        = None
 
+
   def getDividendYield(self):
     raise NotImplementedError("I'd like you to Subclass Stock and implement this Method")
   
   @depends("getDividendYield")
   def getPERatio(self):
-    return 1.0 / self.getDividendYield()
+    try:
+      return 1.0 / self.getDividendYield()
+    except ZeroDivisionError:
+      return 0
 
   def getTickerPrice(self):
     #hilarious
@@ -159,6 +225,7 @@ class PreferredStock(Stock):
   def __init__(self, symbol, lastDividend, fixedDividend, parValue):
     super(PreferredStock, self).__init__(symbol, lastDividend, parValue)
     
+    self.type                 = "Preferred"
     self.fixedDividend        = fixedDividend
     
     #This "optimisation" is incorrect, as it is possible for the "fixed dividend" rate to change, e.g. if it is linked to LIBOR
@@ -186,10 +253,12 @@ class PreferredStock(Stock):
 class CommonStock(Stock):
   def __init__(self, symbol, lastDividend, parValue):
     super(CommonStock, self).__init__(symbol, lastDividend, parValue)
+    self.type = "common"
 
   @depends(None)
   def getDividendYield(self):
-    self.dividendYield = self.lastDividend / self.getTickerPrice()
+    return self.lastDividend / self.getTickerPrice()
+
 
 
 class GBCE(object):
@@ -210,9 +279,19 @@ class GBCE(object):
 
   #@depends("stocks", DictionaryDependency( lamda (key, item): isinstance(item, PreferredStock), "getDividendYield" ) )
   def showInfo(self):
-    toReturn = ["symbol", "type", "last dividend", "fixed dividend", "par value"]
+    toReturn = ["symbol   type  lastDividend  fixedDividend  parValue  PERatio  dividendYield  price" ]
     for (key, stock) in self.stocks.items():
-      toReturn.append("%s     %s     %s     %s     %s" % (stock.symbol, stock.type, stock.lastDividend, stock.fixedDividend, stock.parValue) )
+      toReturn.append ( "s:%s t:%s ld:%s fd:%s pv:%s per:%s dy:%s p:%s" 
+                      % ( stock.symbol, 
+                          stock.type, 
+                          stock.lastDividend, 
+                          stock.fixedDividend if hasattr(stock, "fixedDividend") else "  ", 
+                          stock.parValue, 
+                          stock.getPERatio(), 
+                          stock.getDividendYield(), 
+                          stock.getTickerPrice()
+                        ) 
+                      )
     return "\n".join(toReturn)
 
 class Trade(object):
@@ -238,7 +317,6 @@ class Trade(object):
 
 
   def purchase(self):
-      ipdb.set_trace()
       now = time.time()
 
       if now - self.offerTimestamp > 5:
@@ -266,6 +344,7 @@ class CommandProcessor(object):
     self.PERCENT          = 2
 
   def blocking_getUserInput(self):
+    print self.market.showInfo()
     while True:
       try:
         command = raw_input("\n\n? for help>> ")
@@ -302,7 +381,7 @@ updateFixed symbol percent
     
 
     elif  command == "list":
-      toReturn = """all the info"""
+      toReturn = self.market.showInfo()
     
 
     elif  command.startswith("buy") or command.startswith("sell"):
