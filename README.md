@@ -26,6 +26,14 @@ Here are the notes for this project:
   - PreferredStock.updateFixedDividendPercentage -> PreferredStock.getDividendYield -> Stock.getPERatio
   - Also memoisation of CommonStock.getDividendYield is implemented with the @depends(None) decorator
   - The test for the @depends decorator is test_fixedUpdate_dependencyGraph
+  
+  - decorator syntax is
+    - @depends("dependsOn")
+      - depends installs a proxy around dependsOn which emits an event whenever dependsOn is called
+      - in response to this event, the decorated method will calculate a new value
+      - the current value is memoised by the @depends wrapper, until one of its dependencies is changed
+      - calls the original function return the memoised value for speed
+    - @depends(None) implements memoisation of the result of the function when first called
  
 # usage
   - run the program "python superSimpleStocks.py"
