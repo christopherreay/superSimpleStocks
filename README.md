@@ -21,6 +21,16 @@ Here are the notes for this project:
  - Tests
    - Stock, Market, Trade, UserInteraction
    
+ # Dependency Graph
+  - Super simple dependencies between functions, implemented with python decorators
+  - PreferredStock.updateFixedDividendPercentage -> PreferredStock.getDividendYield -> Stock.getPERatio
+  - Also memoisation of CommonStock.getDividendYield is implemented with the @depends(None) decorator
+  - The test for the @depends decorator is test_fixedUpdate_dependencyGraph
+ 
+ # usage
+   - run the program "python superSimpleStocks.py"
+   - follow the prompt
+   - offers for purchase or sale last five seconds
+     
  #TODO
- - implement tests for Dependency Code
- - add Dictionary Adapter for the @depends decorator
+  - add Dictionary Adapter for the @depends decorator
