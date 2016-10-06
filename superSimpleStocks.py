@@ -25,6 +25,9 @@ def setProperty(obj, address, value):
   else:
     setattr(obj, address, value)
 
+#implements a "does this exist, if not create it" paradigm, using "some.tree.of.attributes" notation
+#  default values may be supplied. 
+#  Works with dictionaries or objects
 def traverse(obj, address, defaultValueList=None):
 
   addressCounter  = 0
@@ -45,33 +48,39 @@ def traverse(obj, address, defaultValueList=None):
   return current
 
 
-
-#and beyond
-class Dependency(dict):
-  pass
-
+#implements a simple dependency.
+#  dependent functions must take no arguments
+#  values from dependent functions are memoised and the memoised version is served
+#  memoised values are automatically updated when any dependency is changed
 class depends(object):
   dependencyID = 0
   dependencies = {}
 
   def __init__(self, *config):
-    ipdb.set_trace()
+    #ipdb.set_trace()
 
+    #store the parameters given to the decorator
     self.config         = config
     
   def __call__(self, underlyingFunction):
-    ipdb.set_trace()
+    #ipdb.set_trace()
 
-    decoratorInstance = self
-    localName = underlyingFunction.__name__
+    decoratorInstance   = self
+    localName           = underlyingFunction.__name__
 
     def wrapped(*args, **kwargs):
-      ipdb.set_trace()
+      #ipdb.set_trace()
 
-      #self for the object the method is bound to
+      #self for the object the function is bound to
       obj                   = args[0]
+      #to identify this instance of the decorator we need the object the function is bound to and the name of the function
+      #  here we store all the context related to this instantiation of the decorator on the object itself, hiding it somewhat (_context)
+      #  this gives us an easy way to diferentiate and to access a persistent context for this decoration
       context = traverse( obj, "_context.decorators.depends.%s" % (localName, ) )
 
+      #until the method is first actually run, we dont know what the object it is bound to is. 
+      #  once it has been run, we can define a context on the object for this specific decorator instantiation
+      #    (specific to this function bound to this object)
       if traverse( context, "firstRun", defaultValueList=[ True ] ) == True:
         context.firstRun     = False
 
@@ -95,53 +104,70 @@ class depends(object):
           pass
         
         
-
+      #the dependency graph allows us to memoise values in the knowledge that they cannot have changed
       if traverse( context, "updateMemoise", defaultValueList=[ True ]) == True:
         context.updateMemoise = False
         #memoizeCurrentValue
         context.currentValue  = underlyingFunction(*args, **kwargs)
-        
-
+      
+      #the currently memoised value, either defined on the firstRun or still here since no dependency has changed
       return context.currentValue
 
     return wrapped
 
     def call(self):
-      ipdb.set_trace()
+      #ipdb.set_trace()
 
       self.underlyingFunction(self.obj)
 
+#the emitter function is a decorator, more or less, but simply manually installed using the definition supplied
+#  as parameter to the @depends decorator
 def emitter( obj, emitterAttrName, dependsContext ):
  
-  ipdb.set_trace()
+  #ipdb.set_trace()
 
+  #the traverse structure neatly deals with our namespace
   context   = traverse( obj,    "_context.decorators.emitter.%s" % (emitterAttrName) )
+  #and implicitly only defines things on firstRun
   listeners = traverse(context, "listeners", defaultValueList=[ [] ])
 
+  #add the context of the @depends
   listeners.append(dependsContext)
 
+  #Thats this function, right here
   emittingFunction = getattr(obj, emitterAttrName)
   #wrap_emitter = None
 
+  #"decorate" this function, we can since the dependsContext knows what object the function it depends on is bound to
+  #  This doesnt have to be the same obj as the initial @depends, but it does have to be available in scope at runtime... probabaly
   def wrap_emitter(underlyingFunction):
+    #replace the function we depend on with a wrapper for it which emits to the @depends decorator that it needs to 
+    #  update its memoised value
     def wrapped_emitter(*args, **kwargs):
-      ipdb.set_trace()
+      #ipdb.set_trace()
 
+      #first thing we need to  get the new value of this function calculated
       toReturn = underlyingFunction(*args, **kwargs)
+      #if the value hasnt changed, then we dont need to update through the depenency graph
       if traverse( context, "oldValue", defaultValueList=[None] ) == toReturn:
         return toReturn
       context.oldValue = toReturn
 
+      #this is all very naively implemented, but simply the dependent function will very often *call* the emitting function
+      #  to determine the new value. Sometimes this is memoised :)
       traverse( context, "cycle", defaultValueList=[ list(context.listeners) ])
+      #putUp and tearDown done at the root of the dependency graph
       traverse( context, "root",  defaultValueList=[ 0 ] )
 
       context.root += 1
-      #This needs to remove all circular dependencies
+      #emit changed event to all listeners (different verbal paradigm, but serves to describe the dependency graph in a different way
+      #  I believe that is called "description" :)
       for listener in context.listeners:
-        if listener in context.cycle:
-          context.cycle.remove(listener)
-          listener.updateMemoise = True
-          listener.call()
+        # if listener in context.cycle:
+        #   #the cycle just maintains a list of which listeners have already been fired by the 
+        #   #context.cycle.remove(listener)
+        listener.updateMemoise = True
+        listener.call()
 
       context.root -= 1
       if context.root == 0:
@@ -397,7 +423,7 @@ updateFixed symbol percent
     
     
     elif  command == "confirm":
-      # ipdb.set_trace()
+      # #ipdb.set_trace()
       self.currentTrade.purchase()
       toReturn = self.currentTrade.trace
     
@@ -427,5 +453,5 @@ updateFixed symbol percent
 
 
 if __name__ == "__main__":
-    ipdb.set_trace()
+    #ipdb.set_trace()
     CommandProcessor(GBCE()).blocking_getUserInput()
