@@ -18,6 +18,7 @@ Here are the notes for this project:
      - blocking with raw_input
    - Dependency / Emitter
      - implemented as a python decorator
+ - Dependency Graph
  - Tests
    - Stock, Market, Trade, UserInteraction
    
